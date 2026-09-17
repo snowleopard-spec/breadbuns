@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>breadbuns User Manual</title>
+<style>
+  /* ===== "explainer" format — do not alter values; add only what the document needs ===== */
+  @page { size: A4; margin: 22mm 20mm 24mm 20mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 10.4pt; }
+  body {
+    font-family: "Charter", "Georgia", "Times New Roman", serif;
+    color: #1f2430; line-height: 1.52;
+  }
+  /* masthead */
+  .masthead { border-bottom: 2.5px solid #1a2f4b; padding-bottom: 10pt; margin-bottom: 4pt; }
+  .kicker {
+    font-family: "Helvetica Neue", Arial, sans-serif; font-size: 7.6pt;
+    letter-spacing: 2.2px; text-transform: uppercase; color: #8a6d2f; margin-bottom: 7pt;
+  }
+  h1 { font-size: 20pt; line-height: 1.18; color: #1a2f4b; font-weight: 700; margin-bottom: 5pt; }
+  .subtitle { font-size: 11.5pt; color: #4a5568; font-style: italic; }
+  /* shaded meta box under the masthead (no side rule) */
+  .meta {
+    font-family: "Helvetica Neue", Arial, sans-serif; font-size: 7.4pt; color: #6b7280;
+    line-height: 1.55; margin: 8pt 0 14pt; padding: 7pt 10pt;
+    background: #f4f5f7;
+  }
+  /* opening paragraph block */
+  .question { margin-bottom: 12pt; }
+  .question p { text-align: justify; }
+  /* section headings: sans, navy, hairline above; optional gold number */
+  h2 {
+    font-family: "Helvetica Neue", Arial, sans-serif; font-size: 11pt; color: #1a2f4b;
+    margin: 15pt 0 6pt; padding-top: 5pt; border-top: 1px solid #d9dce3;
+    page-break-after: avoid;
+  }
+  h2 .num { color: #c9a24b; margin-right: 5pt; }
+  /* body text */
+  p { margin-bottom: 6pt; text-align: justify; }
+  b.lead { color: #1a2f4b; }
+  dfn { font-style: normal; font-weight: 600; color: #1a2f4b; }
+  /* shaded call-out box with a small-caps label (no side rule) */
+  .indicators {
+    font-size: 9.4pt; color: #3d4657; background: #f7f8fa; padding: 5pt 9pt;
+    margin: 4pt 0 8pt;
+  }
+  .indicators b { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 8pt; letter-spacing: .8px; text-transform: uppercase; color: #55627a; }
+  /* a unit that must not split across pages (a step, a scenario) */
+  .chunk { page-break-inside: avoid; margin-bottom: 4pt; }
+  /* small inline status tag after a lead-in */
+  .chunk .tag, .tag {
+    font-family: "Helvetica Neue", Arial, sans-serif; font-size: 7pt; letter-spacing: .8px;
+    text-transform: uppercase; color: #55627a; border: 1px solid #c8ced8; border-radius: 3px;
+    padding: 0 4pt; margin-left: 4pt; vertical-align: 1pt; white-space: nowrap;
+  }
+  .tag.hold { color: #8a3b2f; border-color: #d3a59d; }
+  .tag.safe { color: #2f6b47; border-color: #a9cdb9; }
+  /* a section given extra weight: thicker rule above its heading */
+  .counter h2 { border-top: 2px solid #1a2f4b; }
+  /* tables */
+  table { border-collapse: collapse; width: 100%; margin: 4pt 0 10pt; font-family: "Helvetica Neue", Arial, sans-serif; font-size: 8.4pt; line-height: 1.4; }
+  th { text-align: left; font-size: 7.4pt; letter-spacing: .8px; text-transform: uppercase; color: #55627a; padding: 3pt 6pt; border-bottom: 1px solid #1a2f4b; }
+  td { padding: 3.5pt 6pt; border-bottom: 1px solid #e3e6ec; vertical-align: top; }
+  td:first-child { color: #1a2f4b; font-weight: 600; white-space: nowrap; }
+  /* sources / references */
+  .sources { page-break-before: auto; margin-top: 16pt; }
+  .sources h2 { border-top: 2px solid #1a2f4b; }
+  .sources ol { margin-left: 16pt; font-size: 8.8pt; line-height: 1.6; }
+  .sources li { margin-bottom: 2pt; }
+  .sources a { color: #1a2f4b; text-decoration: none; }
+  .url { color: #6b7280; font-size: 8pt; word-break: break-all; }
+  /* small shaded end-note */
+  .flagnote { font-size: 8.4pt; color: #4a5568; margin-top: 8pt; padding: 6pt 9pt; background: #f4f5f7; }
+  .footer-line { margin-top: 14pt; border-top: 1px solid #d9dce3; padding-top: 5pt;
+    font-family: "Helvetica Neue", Arial, sans-serif; font-size: 7.2pt; color: #9aa1ad; }
+  sup { font-size: 7pt; }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.6pt; color: #1a2f4b; }
+</style>
+</head>
+<body>
+<div class="masthead">
+  <div class="kicker">User Manual · breadbuns</div>
+  <h1>breadbuns</h1>
+  <div class="subtitle">A command-line tool that locks and unlocks PDF files with Adobe's own native password protection, no Adobe software required to create the lock.</div>
+</div>
+<div class="meta">
+<b>2026-09-17.</b> Covers the current build of breadbuns in <code>/Users/wessch/Projects/Stack/breadbuns</code>. Written for someone running the compiled <code>breadbuns</code> binary from a terminal on macOS; no prior command-line experience assumed beyond opening the Terminal app. Does not cover the Go source code itself or how the encryption is implemented internally.
+</div>
+
+<div class="question">
+<p><b class="lead">What this is.</b> breadbuns looks at a folder you choose, finds the PDF files that need locking or unlocking, and does the whole batch after one password prompt. When it locks a file, the result is a genuinely password-protected PDF: opening it in Adobe Acrobat, Preview, or any other PDF reader shows that reader's own "enter password" screen, exactly as if you had protected the file from inside Acrobat itself. breadbuns just does not require Acrobat to be installed to make that happen.</p>
+</div>
+
+<h2>What breadbuns does, in one pass</h2>
+<p><b class="lead">Two jobs, one tool.</b> breadbuns only ever does one of two things in a run: it either <dfn>encrypts</dfn> a set of PDFs (adds a password) or <dfn>decrypts</dfn> a set of PDFs (removes a password). You choose which, each time you run it. It never mixes the two in a single pass, and it never touches a file you have not been shown and asked to confirm.</p>
+<p><b class="lead">Encrypting makes a copy.</b> When you lock <code>report.pdf</code>, breadbuns leaves the original exactly as it was and creates a new file, <code>report_locked.pdf</code>, which is the password-protected one. If <code>report_locked.pdf</code> already exists from an earlier run, a fresh encryption overwrites it. The unlocked original is never deleted, so you always have an unlocked copy sitting next to the locked one unless you remove it yourself.</p>
+<p><b class="lead">Decrypting works in place.</b> There is no copy involved in reverse: breadbuns removes the password from the file itself, in place, once you give the correct password. There is no "original" kept aside for a decrypt, since the encrypted file <i>is</i> the file being worked on.</p>
+
+<div class="indicators"><b>Where it fits</b> &nbsp;Use breadbuns when you need to send a batch of PDFs somewhere and want them to require a password to open, or when you have received locked PDFs of your own making and want the password removed. It is not a general PDF editor, viewer, or a way to add watermarks, permissions, or redactions.</div>
+
+<h2>Starting the program</h2>
+<p><b class="lead">Open a terminal.</b> On a Mac, open the Terminal app (or iTerm, if that is what you use). breadbuns is a text-based program that reads your keyboard directly, so it needs to run in a real terminal window, not through a script that feeds it text from a file.</p>
+<p><b class="lead">Run it.</b> Type the following two lines and press return after each:</p>
+<div class="indicators"><code>cd /Users/wessch/Projects/Stack/breadbuns</code><br><code>./breadbuns</code></div>
+<p><b class="lead">If you have changed the code.</b> Should the program ever need rebuilding after an edit to its source, run <code>go build -o breadbuns .</code> in that same folder first, then start it with <code>./breadbuns</code> as above. Ordinary use of the tool never requires this step.</p>
+
+<h2><span class="num">Step 1</span> Choosing a folder</h2>
+<div class="chunk">
+<p><b class="lead">The folder browser.</b> Instead of typing a path, breadbuns opens a full-screen list of the folder you started in, with its subfolders listed below it. This replaces having to remember or type <code>cd</code> commands.</p>
+<div class="indicators"><b>Controls</b> &nbsp;Up and down arrow keys (or <code>j</code>/<code>k</code>) move the highlighted line. Enter opens a highlighted subfolder, or, if <code>[ Use this folder ]</code> is highlighted, selects the folder you are currently viewing. Backspace moves up to the parent folder. The <code>~</code> key jumps straight to your home folder. <code>q</code> or <code>Esc</code> cancels and quits the program entirely.</div>
+</div>
+<div class="chunk">
+<p><b class="lead">Confirming the choice.</b> Once you press enter on <code>[ Use this folder ]</code>, breadbuns prints the folder path back to you and asks <i>"Use this folder? [Y/n]"</i>. Pressing return alone accepts it, since capital <code>Y</code> is the default. Typing <code>n</code> sends you back into the browser to pick again.</p>
+</div>
+
+<h2><span class="num">Step 2</span> Encrypt or decrypt</h2>
+<p><b class="lead">The menu.</b> Next, breadbuns asks what you want to do, with a short numbered menu: <code>1</code> to encrypt, <code>2</code> to decrypt, or <code>q</code> to quit without doing anything. Type the number and press return.</p>
+
+<h2><span class="num">Step 3</span> Reviewing the file count</h2>
+<p><b class="lead">What gets counted.</b> breadbuns scans every <code>.pdf</code> file directly inside the folder you chose (it does not look inside subfolders) and works out which ones are relevant to the job you picked. For encrypting, that means unlocked PDFs that are not already named with a <code>_locked</code> suffix. For decrypting, it means any PDF that is actually password-protected right now, regardless of its filename.</p>
+<p><b class="lead">The list you see.</b> It then prints how many files matched and lists every one of them by name, so you can check the right files are about to be touched before anything happens. If any PDF in the folder could not be read at all (for instance, a corrupted file), it is listed separately as skipped rather than silently ignored.</p>
+<div class="indicators"><b>Nothing to do</b> &nbsp;If no files match, breadbuns says so and stops there. Nothing is written to disk in that case.</div>
+
+<h2><span class="num">Step 4</span> Confirming and entering a password</h2>
+<div class="chunk">
+<p><b class="lead">Last chance to back out.</b> breadbuns asks <i>"Proceed with encrypting/decrypting these N file(s)? [Y/n]"</i> before it touches anything. Answering <code>n</code> cancels the whole run with no changes made.</p>
+</div>
+<div class="chunk">
+<p><b class="lead">One password, whole batch.</b> After confirming, you are asked for a password once, and it is typed without echoing to the screen, the same way a login prompt hides your typing. That single password is used for every file in the batch: every file you are encrypting in this run gets locked with it, and every file you are decrypting in this run must already be protected with it.</p>
+<div class="indicators"><b>Encrypting only</b> &nbsp;When locking files, you are asked to type the password a second time to confirm it. If the two entries do not match, breadbuns stops and asks you to run it again rather than risk locking files with a password you did not mean to set.</div>
+</div>
+
+<h2><span class="num">Step 5</span> Reading the results</h2>
+<p><b class="lead">The report.</b> Once processing finishes, breadbuns prints a one-line summary: how many files succeeded and how many failed. Below that, it lists the succeeded files by name (for an encryption run, this is the new <code>_locked.pdf</code> name), and, separately, any failures with a short reason next to each one, such as an incorrect password for a specific file during a decrypt run.</p>
+<p><b class="lead">Partial success is normal.</b> A batch is not all-or-nothing: if nine files lock correctly and one fails because it turned out to already be encrypted by something else, breadbuns still completes the other nine and reports the tenth as a failure rather than stopping the whole run.</p>
+
+<div class="counter">
+<h2>Limitations worth knowing before you rely on this</h2>
+<p><b class="lead">PDF files only.</b> breadbuns only understands PDF. Other Adobe file types such as Photoshop or InDesign documents are not supported and will not appear in any file count.</p>
+<p><b class="lead">It can only unlock what it locked.</b> Decrypting is built specifically to reverse breadbuns's own encryption. A PDF that was password-protected by Adobe Acrobat directly, or by some other tool, will not be recognised as something breadbuns can decrypt, and will be reported as a failure rather than opened.</p>
+<p><b class="lead">There is no password recovery.</b> The password is not stored anywhere by breadbuns, in the file or otherwise. If you lock a file and forget the password, there is no way to recover it, from breadbuns or from Adobe. Treat the password the same way you would treat any password you cannot afford to lose.</p>
+<p><b class="lead">Top-level folder only.</b> Only PDFs sitting directly inside the folder you select are processed; PDFs inside subfolders of that folder are left alone and not counted either way.</p>
+<p><b class="lead">Needs a real terminal window.</b> Because the folder browser reads arrow-key presses directly, breadbuns cannot be driven by piping text into it or by calling it from a script that is not itself running in an interactive terminal.</p>
+</div>
+
+<div class="flagnote"><b>If something looks wrong.</b> If a file you expected to see in the count is missing, check whether it is already named <code>_locked</code>, already password-protected, or sitting in a subfolder rather than the chosen folder directly, since all three are handled by design rather than by accident.</div>
+
+<div class="footer-line">breadbuns · PDF lock/unlock CLI · 2026-09-17 · covers day-to-day use only, not the source code or build process.</div>
+</body>
+</html>
