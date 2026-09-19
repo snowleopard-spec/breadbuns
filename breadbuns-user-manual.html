@@ -133,12 +133,13 @@
 
 <h2><span class="num">Step 5</span> Reading the results</h2>
 <p><b class="lead">The report.</b> Once processing finishes, breadbuns prints a one-line summary: how many files succeeded and how many failed. Below that, it lists the succeeded files by name (for an encryption run, this is the new <code>_locked.pdf</code> name), and, separately, any failures with a short reason next to each one, such as an incorrect password for a specific file during a decrypt run.</p>
+<p><b class="lead">Warnings.</b> A decrypt run may end with a third list headed <i>Warnings</i>. A file listed there <em>was</em> unlocked and is fine to use, but its lock settings did not pass an integrity check: the sealed record of the file's permissions, written when it was locked, no longer matches what the file claims. That usually means the file was edited by hand or by a tool that does not follow the PDF standard closely, not that the password was wrong. Treat it as information, not as a failure.</p>
 <p><b class="lead">Partial success is normal.</b> A batch is not all-or-nothing: if nine files lock correctly and one fails because it turned out to already be encrypted by something else, breadbuns still completes the other nine and reports the tenth as a failure rather than stopping the whole run.</p>
 
 <div class="counter">
 <h2>Limitations worth knowing before you rely on this</h2>
 <p><b class="lead">PDF files only.</b> breadbuns only understands PDF. Other Adobe file types such as Photoshop or InDesign documents are not supported and will not appear in any file count.</p>
-<p><b class="lead">It can only unlock what it locked.</b> Decrypting is built specifically to reverse breadbuns's own encryption. A PDF that was password-protected by Adobe Acrobat directly, or by some other tool, will not be recognised as something breadbuns can decrypt, and will be reported as a failure rather than opened.</p>
+<p><b class="lead">It unlocks modern locks only.</b> Decrypting works on any PDF protected with AES-256, which is what breadbuns itself writes and what Adobe Acrobat produces when the compatibility setting is "Acrobat X and later". Files locked with the older RC4 or AES-128 methods (Acrobat's "Acrobat 7" and earlier settings, and many older tools) are recognised but not supported: they are reported as a failure with an "unsupported encryption" reason rather than opened.</p>
 <p><b class="lead">There is no password recovery.</b> The password is not stored anywhere by breadbuns, in the file or otherwise. If you lock a file and forget the password, there is no way to recover it, from breadbuns or from Adobe. Treat the password the same way you would treat any password you cannot afford to lose.</p>
 <p><b class="lead">Top-level folder only.</b> Only PDFs sitting directly inside the folder you select are processed; PDFs inside subfolders of that folder are left alone and not counted either way.</p>
 <p><b class="lead">Needs a real terminal window.</b> Because the folder browser reads arrow-key presses directly, breadbuns cannot be driven by piping text into it or by calling it from a script that is not itself running in an interactive terminal.</p>
@@ -146,6 +147,6 @@
 
 <div class="flagnote"><b>If something looks wrong.</b> If a file you expected to see in the count is missing, check whether it is already named <code>_locked</code>, already password-protected, or sitting in a subfolder rather than the chosen folder directly, since all three are handled by design rather than by accident.</div>
 
-<div class="footer-line">breadbuns · PDF lock/unlock CLI · 2026-09-17 · covers day-to-day use only, not the source code or build process.</div>
+<div class="footer-line">breadbuns 1.2 · PDF lock/unlock CLI · 2026-09-19 · covers day-to-day use only, not the source code or build process.</div>
 </body>
 </html>
