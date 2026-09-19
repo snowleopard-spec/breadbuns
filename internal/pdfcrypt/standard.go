@@ -102,11 +102,15 @@ func Authenticate(encDict pdf.Dict, password string) ([]byte, error) {
 	v, _ := asInt(encDict["V"])
 	r, _ := asInt(encDict["R"])
 	if v != 5 || (r != 5 && r != 6) {
-		return nil, fmt.Errorf("unsupported encryption (V=%d R=%d): breadbuns can only decrypt AES-256 (V5/R6) files it created itself", v, r)
+		return nil, fmt.Errorf("unsupported encryption (V=%d R=%d): breadbuns can only decrypt AES-256 (V5/R6) files", v, r)
 	}
-	U := asBytes(encDict["U"])
+	// Acrobat (and some other writers) emit /U and /O as 127-byte strings:
+	// the 48 significant bytes followed by zero padding. The spec only
+	// defines the first 48 bytes, so accept anything at least that long and
+	// use just the significant prefix.
+	U := first48(asBytes(encDict["U"]))
 	UE := asBytes(encDict["UE"])
-	O := asBytes(encDict["O"])
+	O := first48(asBytes(encDict["O"]))
 	OE := asBytes(encDict["OE"])
 	if len(U) != 48 || len(UE) != 32 {
 		return nil, errors.New("malformed /U or /UE in encryption dictionary")
@@ -131,6 +135,15 @@ func Authenticate(encDict pdf.Dict, password string) ([]byte, error) {
 }
 
 func zeroIV() []byte { return make([]byte, 16) }
+
+// first48 returns the first 48 bytes of b (the spec-defined portion of a
+// V5 /U or /O string), or b unchanged if it is shorter.
+func first48(b []byte) []byte {
+	if len(b) > 48 {
+		return b[:48]
+	}
+	return b
+}
 
 func randBytes(n int) []byte {
 	b := make([]byte, n)

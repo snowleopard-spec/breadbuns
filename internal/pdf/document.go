@@ -19,6 +19,12 @@ type Document struct {
 	objStmCache map[int]map[int]interface{} // streamObjNum -> (member obj num -> value)
 
 	resolving map[Ref]bool
+
+	// streamDecrypt, when set, is applied to the raw bytes of object
+	// streams before they are decoded. In an encrypted file the object
+	// streams themselves are encrypted, so their members cannot be read
+	// until the file key is known (see SetStreamDecryptor).
+	streamDecrypt Transform
 }
 
 // Load reads and parses a PDF file from disk.
@@ -98,6 +104,23 @@ func (d *Document) EncryptDict() (Dict, bool) {
 	return dict, ok
 }
 
+// SetStreamDecryptor installs fn as the decryptor for object-stream data and
+// discards any objects cached so far, so that members of (encrypted)
+// object streams can be read. Call it after authenticating the password.
+func (d *Document) SetStreamDecryptor(fn Transform) {
+	d.streamDecrypt = fn
+	d.objCache = map[int]interface{}{}
+	d.objGenCache = map[int]int{}
+	d.objStmCache = map[int]map[int]interface{}{}
+}
+
+// InObjectStream reports whether object num is stored inside an object
+// stream (as opposed to directly in the file body).
+func (d *Document) InObjectStream(num int) bool {
+	entry, ok := d.xref[num]
+	return ok && entry.inStream
+}
+
 // Resolve follows an indirect reference to its value; non-reference values
 // are returned unchanged.
 func (d *Document) Resolve(obj interface{}) interface{} {
@@ -158,6 +181,13 @@ func (d *Document) decodeObjStream(streamNum int) map[int]interface{} {
 	if !ok {
 		return out
 	}
+	if d.streamDecrypt != nil {
+		plain, err := d.streamDecrypt(s.Data)
+		if err != nil {
+			return out
+		}
+		s = &Stream{Dict: s.Dict, Data: plain}
+	}
 	raw, err := decodeStreamForStructure(s)
 	if err != nil {
 		return out
@@ -197,11 +227,11 @@ func (d *Document) decodeObjStream(streamNum int) map[int]interface{} {
 }
 
 // AllObjects returns every "real" indirect object number in the document,
-// i.e. excluding cross-reference streams and object-stream containers
-// (whose members are already included individually), and excluding the
-// /Encrypt dictionary itself (which per spec is never encrypted/decrypted
-// and must not be swept up by a content transform). Object streams are
-// effectively flattened.
+// i.e. excluding cross-reference streams, object-stream containers (whose
+// members are already included individually), any linearization
+// dictionary, and the /Encrypt dictionary itself (which per spec is never
+// encrypted/decrypted and must not be swept up by a content transform).
+// Object streams are effectively flattened.
 func (d *Document) AllObjects() []int {
 	skip := -1
 	if ref, ok := d.trailer["Encrypt"].(Ref); ok {
@@ -219,6 +249,14 @@ func (d *Document) AllObjects() []int {
 		val := d.get(num)
 		if s, ok := val.(*Stream); ok {
 			if t, _ := s.Dict["Type"].(Name); t == "XRef" || t == "ObjStm" {
+				continue
+			}
+		}
+		// A linearization dictionary describes byte offsets of the file it
+		// was written in; since we rewrite the file it would be stale (and
+		// misleading to readers), so drop it.
+		if dict, ok := val.(Dict); ok {
+			if _, linearized := dict["Linearized"]; linearized {
 				continue
 			}
 		}

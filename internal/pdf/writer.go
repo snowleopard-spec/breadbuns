@@ -29,6 +29,24 @@ func Write(doc *Document, opts WriteOptions) ([]byte, error) {
 	nums := doc.AllObjects()
 	sort.Ints(nums)
 
+	// Per ISO 32000-2 §7.6.3.2, when the /Encrypt dictionary carries
+	// /EncryptMetadata false the document-level XMP metadata stream is
+	// stored in the clear and must be neither decrypted nor re-encrypted.
+	plainMetadata := false
+	if enc, ok := doc.EncryptDict(); ok {
+		if v, ok := enc["EncryptMetadata"].(bool); ok && !v {
+			plainMetadata = true
+		}
+	}
+	skipStreamData := func(s *Stream) bool {
+		if plainMetadata {
+			if t, _ := s.Dict["Type"].(Name); t == "Metadata" {
+				return true
+			}
+		}
+		return hasIdentityCryptFilter(s)
+	}
+
 	type outObj struct {
 		num, gen int
 		val      interface{}
@@ -44,7 +62,15 @@ func Write(doc *Document, opts WriteOptions) ([]byte, error) {
 			continue
 		}
 		cloned := Clone(val)
-		transformed, err := transformObject(cloned, opts.Transform)
+		fn := opts.Transform
+		// When the source document is encrypted, members of object streams
+		// were never individually encrypted (only the enclosing stream was,
+		// and that has already been decrypted to read them), so their
+		// strings must be copied through untouched.
+		if fn != nil && doc.IsEncrypted() && doc.InObjectStream(num) {
+			fn = nil
+		}
+		transformed, err := transformObject(cloned, fn, skipStreamData)
 		if err != nil {
 			return nil, fmt.Errorf("pdf: object %d: %w", num, err)
 		}
@@ -82,8 +108,10 @@ func Write(doc *Document, opts WriteOptions) ([]byte, error) {
 	fmt.Fprintf(&buf, "%%PDF-%s\n%%\xE2\xE3\xCF\xD3\n", version)
 
 	offsets := make(map[int]int64, len(objs))
+	gens := make(map[int]int, len(objs))
 	for _, o := range objs {
 		offsets[o.num] = int64(buf.Len())
+		gens[o.num] = o.gen
 		fmt.Fprintf(&buf, "%d %d obj\n", o.num, o.gen)
 		writeObject(&buf, o.val)
 		buf.WriteString("\nendobj\n")
@@ -100,7 +128,7 @@ func Write(doc *Document, opts WriteOptions) ([]byte, error) {
 			buf.WriteString("0000000000 00000 f \n")
 			continue
 		}
-		fmt.Fprintf(&buf, "%010d %05d n \n", off, 0)
+		fmt.Fprintf(&buf, "%010d %05d n \n", off, gens[n])
 	}
 
 	trailer["Size"] = int64(size)
@@ -112,17 +140,45 @@ func Write(doc *Document, opts WriteOptions) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// hasIdentityCryptFilter reports whether the stream declares an explicit
+// /Crypt filter using the Identity crypt filter (the default /Name), which
+// per §7.4.10 means the stream's data is stored unencrypted regardless of
+// the document's encryption, so it must pass through untouched in both
+// directions.
+func hasIdentityCryptFilter(s *Stream) bool {
+	filters := filterNames(s.Dict["Filter"])
+	parms := decodeParms(s.Dict["DecodeParms"], len(filters))
+	for i, f := range filters {
+		if f != "Crypt" {
+			continue
+		}
+		name := Name("Identity")
+		if i < len(parms) && parms[i] != nil {
+			if n, ok := parms[i]["Name"].(Name); ok {
+				name = n
+			}
+		}
+		if name == "Identity" {
+			return true
+		}
+	}
+	return false
+}
+
 func randomBytes(n int) []byte {
 	b := make([]byte, n)
 	_, _ = rand.Read(b)
 	return b
 }
 
-func transformObject(obj interface{}, fn Transform) (interface{}, error) {
+// transformObject applies fn to every string and stream body within obj.
+// skipStreamData, if non-nil, exempts a stream's *data* (never its
+// dictionary's strings) from the transform.
+func transformObject(obj interface{}, fn Transform, skipStreamData func(*Stream) bool) (interface{}, error) {
 	switch v := obj.(type) {
 	case Array:
 		for i, e := range v {
-			t, err := transformObject(e, fn)
+			t, err := transformObject(e, fn, skipStreamData)
 			if err != nil {
 				return nil, err
 			}
@@ -131,7 +187,7 @@ func transformObject(obj interface{}, fn Transform) (interface{}, error) {
 		return v, nil
 	case Dict:
 		for k, e := range v {
-			t, err := transformObject(e, fn)
+			t, err := transformObject(e, fn, skipStreamData)
 			if err != nil {
 				return nil, err
 			}
@@ -139,8 +195,11 @@ func transformObject(obj interface{}, fn Transform) (interface{}, error) {
 		}
 		return v, nil
 	case *Stream:
-		if _, err := transformObject(v.Dict, fn); err != nil {
+		if _, err := transformObject(v.Dict, fn, skipStreamData); err != nil {
 			return nil, err
+		}
+		if fn != nil && skipStreamData != nil && skipStreamData(v) {
+			fn = nil
 		}
 		if fn != nil {
 			data, err := fn(v.Data)

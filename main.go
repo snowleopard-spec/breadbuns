@@ -322,10 +322,12 @@ func decryptFile(src, password string) error {
 	if err != nil {
 		return err
 	}
+	decrypt := func(b []byte) ([]byte, error) { return pdfcrypt.DecryptData(fileKey, b) }
+	// Object streams (used by Acrobat and most modern writers) are
+	// encrypted as a whole; the parser needs the key to read their members.
+	doc.SetStreamDecryptor(decrypt)
 
-	out, err := pdf.Write(doc, pdf.WriteOptions{
-		Transform: func(b []byte) ([]byte, error) { return pdfcrypt.DecryptData(fileKey, b) },
-	})
+	out, err := pdf.Write(doc, pdf.WriteOptions{Transform: decrypt})
 	if err != nil {
 		return fmt.Errorf("decrypting: %w", err)
 	}

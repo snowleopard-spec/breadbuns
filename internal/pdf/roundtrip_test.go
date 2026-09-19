@@ -56,9 +56,9 @@ func decrypt(t *testing.T, encrypted []byte, password string) []byte {
 	if err != nil {
 		t.Fatalf("authenticate: %v", err)
 	}
-	out, err := pdf.Write(doc, pdf.WriteOptions{
-		Transform: func(b []byte) ([]byte, error) { return pdfcrypt.DecryptData(fileKey, b) },
-	})
+	fn := func(b []byte) ([]byte, error) { return pdfcrypt.DecryptData(fileKey, b) }
+	doc.SetStreamDecryptor(fn)
+	out, err := pdf.Write(doc, pdf.WriteOptions{Transform: fn})
 	if err != nil {
 		t.Fatalf("decrypt: %v", err)
 	}
