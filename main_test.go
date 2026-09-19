@@ -46,7 +46,7 @@ func TestEncryptFileThenDecryptFile(t *testing.T) {
 		t.Fatalf("locked copy is not reported as encrypted")
 	}
 
-	if err := decryptFile(locked, "wrong password"); err == nil {
+	if _, err := decryptFile(locked, "wrong password"); err == nil {
 		t.Fatalf("expected decryptFile to fail with wrong password")
 	}
 	// File must be untouched after a failed decrypt attempt.
@@ -58,7 +58,7 @@ func TestEncryptFileThenDecryptFile(t *testing.T) {
 		t.Fatalf("locked copy lost its encryption after a failed decrypt attempt")
 	}
 
-	if err := decryptFile(locked, password); err != nil {
+	if _, err := decryptFile(locked, password); err != nil {
 		t.Fatalf("decryptFile: %v", err)
 	}
 	finalDoc, err := pdf.Load(locked)

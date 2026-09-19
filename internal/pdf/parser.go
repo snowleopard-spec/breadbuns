@@ -8,10 +8,18 @@ import (
 
 var errEOF = errors.New("pdf: unexpected end of input")
 
+// maxNestingDepth bounds how deeply arrays and dictionaries may nest. Real
+// PDFs stay well under a few dozen levels; the cap exists so a malformed or
+// hostile file cannot exhaust the stack through unbounded recursion.
+const maxNestingDepth = 512
+
+var errTooDeep = errors.New("pdf: object nesting too deep")
+
 // parser is a recursive-descent reader over the raw file bytes.
 type parser struct {
-	data []byte
-	pos  int
+	data  []byte
+	pos   int
+	depth int // current array/dict nesting level
 }
 
 func isWhitespace(b byte) bool {
@@ -82,6 +90,11 @@ func (p *parser) parseObject() (interface{}, error) {
 	p.skipWhitespaceAndComments()
 	if p.eof() {
 		return nil, errEOF
+	}
+	p.depth++
+	defer func() { p.depth-- }()
+	if p.depth > maxNestingDepth {
+		return nil, errTooDeep
 	}
 	b := p.data[p.pos]
 	switch {

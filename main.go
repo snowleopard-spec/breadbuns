@@ -20,6 +20,8 @@ import (
 	"golang.org/x/term"
 )
 
+const version = "1.2"
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "breadbuns:", err)
@@ -30,7 +32,7 @@ func main() {
 func run() error {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("breadbuns — PDF locker")
+	fmt.Printf("breadbuns %s — PDF locker\n", version)
 	fmt.Println()
 
 	start, err := os.Getwd()
@@ -126,14 +128,18 @@ func run() error {
 		return nil
 	}
 
-	var succeeded, failed []string
+	var succeeded, failed, warnings []string
 	for _, name := range candidates {
 		src := filepath.Join(folder, name)
 		var procErr error
 		if mode == "encrypt" {
 			procErr = encryptFile(src, password)
 		} else {
-			procErr = decryptFile(src, password)
+			var warn string
+			warn, procErr = decryptFile(src, password)
+			if warn != "" {
+				warnings = append(warnings, fmt.Sprintf("%s (%s)", name, warn))
+			}
 		}
 		if procErr != nil {
 			failed = append(failed, fmt.Sprintf("%s (%v)", name, procErr))
@@ -153,6 +159,12 @@ func run() error {
 	if len(failed) > 0 {
 		fmt.Println("\nFailed:")
 		for _, n := range failed {
+			fmt.Println("  -", n)
+		}
+	}
+	if len(warnings) > 0 {
+		fmt.Println("\nWarnings (file decrypted, but its encryption dictionary did not pass the integrity check):")
+		for _, n := range warnings {
 			fmt.Println("  -", n)
 		}
 	}
@@ -307,20 +319,26 @@ func encryptFile(src, password string) error {
 	return nil
 }
 
-func decryptFile(src, password string) error {
+// decryptFile unlocks src in place. A non-empty warning means the file was
+// decrypted but its /Perms integrity block did not verify (see
+// pdfcrypt.VerifyPerms); err means nothing was changed on disk.
+func decryptFile(src, password string) (warning string, err error) {
 	doc, err := pdf.Load(src)
 	if err != nil {
-		return fmt.Errorf("parsing PDF: %w", err)
+		return "", fmt.Errorf("parsing PDF: %w", err)
 	}
 
 	encDict, ok := doc.EncryptDict()
 	if !ok {
-		return errors.New("file is not encrypted")
+		return "", errors.New("file is not encrypted")
 	}
 
 	fileKey, err := pdfcrypt.Authenticate(encDict, password)
 	if err != nil {
-		return err
+		return "", err
+	}
+	if perr := pdfcrypt.VerifyPerms(encDict, fileKey); perr != nil {
+		warning = perr.Error()
 	}
 	decrypt := func(b []byte) ([]byte, error) { return pdfcrypt.DecryptData(fileKey, b) }
 	// Object streams (used by Acrobat and most modern writers) are
@@ -329,16 +347,16 @@ func decryptFile(src, password string) error {
 
 	out, err := pdf.Write(doc, pdf.WriteOptions{Transform: decrypt})
 	if err != nil {
-		return fmt.Errorf("decrypting: %w", err)
+		return "", fmt.Errorf("decrypting: %w", err)
 	}
 
 	tmp := src + ".tmp"
 	if err := os.WriteFile(tmp, out, 0o644); err != nil {
-		return fmt.Errorf("writing: %w", err)
+		return "", fmt.Errorf("writing: %w", err)
 	}
 	if err := os.Rename(tmp, src); err != nil {
 		os.Remove(tmp)
-		return fmt.Errorf("replacing original: %w", err)
+		return "", fmt.Errorf("replacing original: %w", err)
 	}
-	return nil
+	return warning, nil
 }

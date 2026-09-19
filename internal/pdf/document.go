@@ -18,8 +18,6 @@ type Document struct {
 	objGenCache map[int]int
 	objStmCache map[int]map[int]interface{} // streamObjNum -> (member obj num -> value)
 
-	resolving map[Ref]bool
-
 	// streamDecrypt, when set, is applied to the raw bytes of object
 	// streams before they are decoded. In an encrypted file the object
 	// streams themselves are encrypted, so their members cannot be read
@@ -70,7 +68,6 @@ func Parse(data []byte) (*Document, error) {
 		objCache:    map[int]interface{}{},
 		objGenCache: map[int]int{},
 		objStmCache: map[int]map[int]interface{}{},
-		resolving:   map[Ref]bool{},
 	}, nil
 }
 
@@ -143,6 +140,8 @@ func (d *Document) get(num int) interface{} {
 	if entry.inStream {
 		val = d.getFromObjStream(entry.streamNum, num)
 		d.objGenCache[num] = 0
+	} else if !d.validOffset(entry.offset) {
+		val = nil
 	} else {
 		p := &parser{data: d.data, pos: int(entry.offset)}
 		n, g, v, err := p.parseIndirectObject()
@@ -157,6 +156,13 @@ func (d *Document) get(num int) interface{} {
 	return val
 }
 
+// validOffset reports whether a byte offset taken from the file's own
+// cross-reference data actually lies inside the file. Offsets are untrusted
+// input: a corrupt or hostile xref must not send the parser out of bounds.
+func (d *Document) validOffset(off int64) bool {
+	return off >= 0 && off < int64(len(d.data))
+}
+
 func (d *Document) getFromObjStream(streamNum, wantNum int) interface{} {
 	members, ok := d.objStmCache[streamNum]
 	if !ok {
@@ -169,7 +175,7 @@ func (d *Document) getFromObjStream(streamNum, wantNum int) interface{} {
 func (d *Document) decodeObjStream(streamNum int) map[int]interface{} {
 	out := map[int]interface{}{}
 	entry, ok := d.xref[streamNum]
-	if !ok || entry.inStream {
+	if !ok || entry.inStream || !d.validOffset(entry.offset) {
 		return out
 	}
 	p := &parser{data: d.data, pos: int(entry.offset)}

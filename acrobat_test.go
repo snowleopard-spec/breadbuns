@@ -25,11 +25,13 @@ func TestDecryptAcrobatFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := decryptFile(src, "wrong"); err == nil {
+	if _, err := decryptFile(src, "wrong"); err == nil {
 		t.Fatalf("expected wrong password to be rejected")
 	}
-	if err := decryptFile(src, "claude"); err != nil {
+	if warn, err := decryptFile(src, "claude"); err != nil {
 		t.Fatalf("decryptFile: %v", err)
+	} else if warn != "" {
+		t.Fatalf("unexpected /Perms warning on a well-formed file: %s", warn)
 	}
 
 	doc, err := pdf.Load(src)
@@ -59,7 +61,7 @@ func TestDecryptAcrobatFile(t *testing.T) {
 		t.Fatalf("encryptFile: %v", err)
 	}
 	locked := filepath.Join(dir, "acrobat_locked.pdf")
-	if err := decryptFile(locked, "again"); err != nil {
+	if _, err := decryptFile(locked, "again"); err != nil {
 		t.Fatalf("decryptFile (round trip): %v", err)
 	}
 
@@ -93,8 +95,10 @@ func TestDecryptCleartextMetadata(t *testing.T) {
 	if err := os.WriteFile(src, original, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := decryptFile(src, "claude"); err != nil {
+	if warn, err := decryptFile(src, "claude"); err != nil {
 		t.Fatalf("decryptFile: %v", err)
+	} else if warn != "" {
+		t.Fatalf("unexpected /Perms warning on a well-formed file: %s", warn)
 	}
 
 	doc, err := pdf.Load(src)
@@ -115,7 +119,7 @@ func TestDecryptCleartextMetadata(t *testing.T) {
 		t.Fatalf("encryptFile: %v", err)
 	}
 	locked := filepath.Join(dir, "clearmeta_locked.pdf")
-	if err := decryptFile(locked, "again"); err != nil {
+	if _, err := decryptFile(locked, "again"); err != nil {
 		t.Fatalf("decryptFile (round trip): %v", err)
 	}
 	if qpdfPath, err := exec.LookPath("qpdf"); err == nil {

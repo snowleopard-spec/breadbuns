@@ -134,6 +134,40 @@ func Authenticate(encDict pdf.Dict, password string) ([]byte, error) {
 	return nil, ErrIncorrectPassword
 }
 
+// VerifyPerms checks the /Perms integrity block of a V5 /Encrypt dictionary
+// against the recovered file key: it must decrypt to the "adb" marker, and
+// its embedded permission bits and EncryptMetadata flag must agree with the
+// dictionary's own /P and /EncryptMetadata entries. A failure means the
+// encryption dictionary was altered after the file was written (or the
+// writer did not follow the spec); the file can still be decrypted, so
+// callers treat this as a warning.
+func VerifyPerms(encDict pdf.Dict, fileKey []byte) error {
+	perms := asBytes(encDict["Perms"])
+	if len(perms) != 16 {
+		return errors.New("missing or malformed /Perms entry")
+	}
+	b := aesECBDecrypt(fileKey, perms)
+	if b[9] != 'a' || b[10] != 'd' || b[11] != 'b' {
+		return errors.New("/Perms integrity check failed: block does not decrypt to the expected marker")
+	}
+	p, _ := asInt(encDict["P"])
+	if binary.LittleEndian.Uint32(b[0:4]) != uint32(int32(p)) {
+		return errors.New("/Perms disagrees with /P: permission bits were altered")
+	}
+	encryptMetadata := true
+	if v, ok := encDict["EncryptMetadata"].(bool); ok {
+		encryptMetadata = v
+	}
+	want := byte('T')
+	if !encryptMetadata {
+		want = 'F'
+	}
+	if b[8] != want {
+		return errors.New("/Perms disagrees with /EncryptMetadata")
+	}
+	return nil
+}
+
 func zeroIV() []byte { return make([]byte, 16) }
 
 // first48 returns the first 48 bytes of b (the spec-defined portion of a
